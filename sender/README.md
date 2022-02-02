@@ -1,21 +1,25 @@
 # Sender
+- A slow email send function
+- Add a notify_all (observe the slowness ) -> sends each message synchronously
+- Starting a Process (Task)
+  - Using Task start a process asynchronously
+  - iex> Task.start(fn -> IO.puts("Hello async world!") end)
+    The message is printed immediately.  It returns a PID (Process Identifier)
 
-**TODO: Add description**
+  - Update notify_all to use Task to send email async
+    - iex> Sender.notify_all(emails)
+    Observe immedate response in the result. All functions were called concurrently and finish a the same time.
 
-## Installation
+NOTE: Task.start/1 has one limitation by design. It does not reuturn the result of the function that was executed.
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `sender` to your list of dependencies in `mix.exs`:
+To retrieve the result of a function, you have to use Task.async1.  It returns a %Task{} struct.
 
-```elixir
-def deps do
-  [
-    {:sender, "~> 0.1.0"}
-  ]
-end
-```
+For e.g.
+  - iex> task = Task.async(fn -> Sender.send_email("hello@world.com") end)
+The send_email is now running in the background.  
+  The result contains 
+    - owner -> the PID of the process that started the Task process
+    - pid -> pid is the identifier of the Task process itself
+    - ref is the process monitor reference
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/sender](https://hexdocs.pm/sender).
-
+  
