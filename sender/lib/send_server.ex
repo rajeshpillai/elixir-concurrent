@@ -38,6 +38,7 @@ defmodule SendServer do
  end
 
   # The handle_continue callback function#
+  #-------------------------------------------
   # The handle_continue/2 callback is a recent addition to GenServer. Often GenServer processes do complex work as soon as they start. Rather than blocking the whole application from starting, we return {:ok, state, {:continue, term}} from the init/1 callback and use handle_continue/2.
 
   # Return values#
@@ -90,5 +91,35 @@ defmodule SendServer do
   # By returning {reply, state, state}, we send back the current state to the caller.
 
   # Let’s try it out in IEx mode.
+
+
+  # handle_cast
+  #-------------------------------------
+
+  #   The handle_cast callback function
+  # Now, let’s implement sending emails using handle_cast/2. The arguments given to handle_cast/2 are just a term for the message and the state. We pattern match on the message {:send, email}:
+
+  # def handle_cast({:send, email}, state) do
+  #     # to do...
+  # end
+  # Return values
+  # Most of the times we will return one of the following tuples:
+
+  # {:noreply, new_state}
+
+  # {:noreply, new_state, {:continue, term}}
+
+  # {:stop, reason, new_state}
+
+
+  # When using GenServer.cast/2, we always get :ok as a reply.
+  # The reply comes almost immediately. This means that the GenServer
+  # process has acknowledged the message while the process is performing the actual work.
+
+  def handle_cast({:send, email}, state) do
+    Sender.send_email(email)
+    emails = [%{email: email, status: "sent", retries: 0}] ++ state.emails
+    {:noreply, %{state | emails: emails}}
+  end
 
 end
