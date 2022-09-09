@@ -30,7 +30,7 @@ defmodule SendServer do
   # :ignore and {:stop, reason}#
   # Finally, :ignore and {:stop, reason} prevent the process from starting. If the given configuration is not valid or something else prevents this process from continuing, we can return either :ignore or {:stop, reason}. The difference is that if the process is under a supervisor, {:stop, reason} makes the supervisor restart it. On the other hand, :ignore won’t trigger a restart.
 
-  def init(args) do
+  def init_x(args) do
     IO.puts("Received arguments: #{inspect(args)}")
     max_retries = Keyword.get(args, :max_retries, 5)
     state = %{emails: [], max_retries: max_retries}
@@ -38,7 +38,7 @@ defmodule SendServer do
  end
 
   # The handle_continue callback function#
-  #-------------------------------------------
+  # =============================================
   # The handle_continue/2 callback is a recent addition to GenServer. Often GenServer processes do complex work as soon as they start. Rather than blocking the whole application from starting, we return {:ok, state, {:continue, term}} from the init/1 callback and use handle_continue/2.
 
   # Return values#
@@ -94,7 +94,7 @@ defmodule SendServer do
 
 
   # handle_cast
-  #-------------------------------------
+  # =============================================
 
   #   The handle_cast callback function
   # Now, let’s implement sending emails using handle_cast/2. The arguments given to handle_cast/2 are just a term for the message and the state. We pattern match on the message {:send, email}:
@@ -116,10 +116,75 @@ defmodule SendServer do
   # The reply comes almost immediately. This means that the GenServer
   # process has acknowledged the message while the process is performing the actual work.
 
-  def handle_cast({:send, email}, state) do
+  def handle_cast_x({:send, email}, state) do
     Sender.send_email(email)
     emails = [%{email: email, status: "sent", retries: 0}] ++ state.emails
     {:noreply, %{state | emails: emails}}
+  end
+
+
+  # The handle_info callback function
+  # =============================================
+
+  # Other than using GenServer.cast/2 and GenServer.call/3, we can also send a message to a process using Process.send/2. This generic message triggers the handle_info/2 callback, which works exactly like handle_cast/2 and can return the same set of tuples. Usually, handle_info/2 deals with system messages. Normally, we expose our server API using cast/2 and call/2 and keep send/2 for internal use.
+
+  # Implement retries for failed emails
+
+  # Let’s see how we can use handle_info/2. We’ll implement retries for emails
+  # that fail to send. To test this, we need to modify sender.ex, so one of the emails
+  # returns an error. We replace our send_mail/1 logic with this
+
+
+  # All emails to konnichiwa@world.com will return :error, but we have to make
+  # sure this persists correctly. After this, we update the
+  # handle_cast/2 callback in send_server.ex:
+
+  def handle_cast({:send, email}, state) do
+    status =
+      case Sender.send_email(email) do
+        {:ok, "email_sent"} -> "sent"
+        :error -> "failed"
+      end
+    emails = [%{email: email, status: status, retries: 0}] ++ state.emails
+    {:noreply, %{state | emails: emails}}
+  end
+
+  # To test the above (error scenario)
+  #  Send messages after a specified delay
+  #  Now we have everything in place to implement retries. We use Process.send_after/3.
+  #  This is similar to Process.send/2, except it sends the message after the specified delay. We start periodically checking for failed emails as soon as the server starts. Let’s add this to our init/1 callback before the return statement:
+
+  def init(args) do
+    IO.puts("Received arguments: #{inspect(args)}")
+    max_retries = Keyword.get(args, :max_retries, 5)
+    state = %{emails: [], max_retries: max_retries}
+
+    #Call self after 5s
+    Process.send_after(self(), :retry, 5000)
+
+    {:ok, state}
+ end
+
+ # Implemnent handle_info
+
+ #  Retry as per max tries before giving up
+  def handle_info(:retry, state) do
+    {failed, done} =
+      Enum.split_with(state.emails, fn item ->
+        item.status == "failed" && item.retries < state.max_retries
+      end)
+    retried =
+      Enum.map(failed, fn item ->
+        IO.puts("Retrying email #{item.email}...")
+        new_status =
+          case Sender.send_email(item.email) do
+            {:ok, "email_sent"} -> "sent"
+            :error -> "failed"
+          end
+        %{email: item.email, status: new_status, retries: item.retries + 1}
+      end)
+      Process.send_after(self(), :retry, 5000)
+      {:noreply, %{state | emails: retried ++ done}}
   end
 
 end
