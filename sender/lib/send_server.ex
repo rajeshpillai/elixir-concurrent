@@ -207,4 +207,16 @@ defmodule SendServer do
     IO.puts("Terminating with reason #{reason}")
   end
 
+  # NOTE: LIMITATION OF OUR GENSERVER
+  ======================================
+  # Our SendServer implementation is far from ideal. Remember that send_email/1 pauses the process for three seconds. If we try running GenServer.cast(pid, {:send, "hello@email.com"}) several times in a row, GenServer acknowledges all messages by returning :ok. However, it doesn’t perform the work straight away if it is busy doing something else. After all, it’s just a single process doing all the work. All these messages are placed in the process’s message queue and executed one by one.
+
+  # Even worse, if we try using GenServer.call(pid, :get_state) while the process is still busy, we get a timeout error. By default, the GenServer.call/3 will give an error after 5000 ms. We can tweak this by providing an optional third argument. However, this is still not a practical solution.
+
+  # Use the Task module with GenServer#
+  # We fix this by building a significantly improved job processing system. It will be capable of performing any job concurrently, such as sending emails and retrying the jobs that fail. All we have to do is change our approach slightly.
+
+  # We can free up our GenServer process by using Task.start/1 and Task.async/2 to run the code concurrently. Upon completion, the Task process sends messages back to GenServer, which we can process with handle_info/2. For more information, see the documentation for Task.Supervisor.async_nolink/3, which contains some useful examples.
+
+
 end
