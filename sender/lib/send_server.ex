@@ -187,4 +187,24 @@ defmodule SendServer do
       {:noreply, %{state | emails: retried ++ done}}
   end
 
+
+  # The callback terminate function
+  # ===================================
+
+  # The terminate/2 callback is usually invoked before the process
+  # exits, but only when the process itself is responsible for the
+  # exit. Most often, the exit results from explicitly
+  # returning {:stop, reason, state} from a callback (excluding init/1).
+  # It can also happen when an unhandled exception happens within
+  # the process.
+
+  # Caution when relying on terminate/2#
+  # There are cases when a GenServer process is forced to exit due to an external event—for example, when the whole application shuts down. In such cases, terminate/2 is not invoked by default.
+
+  # This is something we must keep in mind if we want to ensure that important business logic always runs before the process exits. For example, we may want to persist in-memory data (stored in the process’s state) to the database before the process dies. This is out of the scope of this course. However, if we want to ensure that terminate/2 is always called, we can look into setting Process.flag(:trap_exit, true) on the process, or use Process.monitor/1 to perform the required work in a separate process.
+
+  def terminate(reason, _state) do
+    IO.puts("Terminating with reason #{reason}")
+  end
+
 end
